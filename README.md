@@ -1,6 +1,6 @@
 # Econ_Ra_DataTask
 
-**This repository contains the Data Task ([posted by LSE prof. Joe Hazell](https://twitter.com/jadhazell/status/1635962875121479680?s=46&t=QVcBmjsnkEceBS-DIc5S7A)) , the .csv files required and the solution is given in the following three formats:**
+**This repository contains the Data Task ([posted by LSE prof. Joe Hazell](https://twitter.com/jadhazell/status/1635962875121479680?s=46&t=QVcBmjsnkEceBS-DIc5S7A)) and the .csv files required to solve it. The solution is presented in the following three formats:**
 1. The Origional Code File - "RA_Data_Task_Code_File.rmd"
 2. The .html file: Can be viewed using the following [link](https://sprmnth.github.io/Econ_Ra_DataTask/RA_Data_Task.html).
 3. The .pdf file named "RA_Data_Task_Solution.pdf".
