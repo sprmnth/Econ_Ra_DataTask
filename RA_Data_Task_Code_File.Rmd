@@ -1,0 +1,500 @@
+---
+title: "Research Assistant - Task - Solutions"
+author: "Saipremnath M"
+date: "23/04/2023"
+output:
+  pdf_document: default
+  code_download: true
+  html_document: default
+---
+<br><br><br><br>
+```{r setup, include=FALSE}
+knitr::opts_chunk$set()
+```
+<center>
+**Task 1: Data Analysis - State Level Inflation**
+</center>
+<br><br><br>
+**Sub-Question 1: Data Cleaning and Tidying**
+<br><br>
+Let us first load all required packages needed for the analysis
+```{r packages, echo = T, results = 'hide', message = FALSE, warning = FALSE}
+pkgs <- c("plyr", "dplyr", "tidyr", "readr", "ggplot2")
+sapply(pkgs, require, character.only = T)
+```
+<br>
+Let us first read in the .csv file statecpi_beta.csv file. This file contains quarter-wise state level data on inflation, starting from 1978. 
+```{r reading_in_file, echo = T, results = 'hide', message = FALSE, warning = FALSE}
+library(readr)
+library(DT)
+setwd("/Volumes/Fire/RA_Econ/Econ RA Assignments/RA_task2023_with_data")
+statecpi_beta <- read_csv("statecpi_beta.csv")
+```
+<br>
+Let us check if the file was read correctly.
+```{r}
+datatable(statecpi_beta, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T) )
+summary(statecpi_beta)
+```
+<br>
+Everything looks good! **Now let's move on towards tidying the data**
+<br><br>
+*1.Missing States*
+<br>
+There seem to be certain states missing. Let us confirm that fact.  
+```{r}
+  n_distinct(statecpi_beta$state) #Gives number of distinct states in "statecpi_beta"
+```
+There are only **34** distinct states in the dataset. We must identify the missing states. 
+```{r}
+# Create a vector of all 50 states in the USA
+all_states <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+                  "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas",
+                  "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+                  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
+                  "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
+                  "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas",
+                  "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming")
+  
+# Find the missing states
+missing_states <- setdiff(all_states, unique(statecpi_beta$state))
+  
+# Convert the missing_states vector into a table using kable
+knitr::kable(data.frame(missing_states), col.names = "Missing States")
+```
+<br><br>
+*2. Every State has either 38 years or 29 years of quarter-wise inflation data.*
+<br>
+The data provides for quarter-wise data for 21 states for 38 years from 1978. However, all of them are missing quarter-wise data for the years 1987 and 1988. 
+On the other hand, the rest of the 13 states have quarter-wise data from 1989 till 2017 for 29 years
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+
+# Group data by state and count unique years
+state_year_counts <- statecpi_beta %>%
+group_by(state) %>%
+summarise(min_year = min(year),
+              max_year = max(year),
+              n_years = n_distinct(year),
+              missing_years = paste(setdiff(min_year:max_year, year), collapse = ", ")) 
+  
+# Print the results
+datatable(state_year_counts, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T) )
+  
+```
+<br>
+More importantly, all the 21 states that have data from 1978, are missing data from 1987 and 1988.
+<br><br>
+*3. Some years may not have data for all 4 quarters.*
+<br>
+An Eye Test reveals that there are 4699 entries in the "statecpi_beta" dataframe. This implies that there could be one or more states that do not have data for all quarters for one or more years. We need to identify such cases. 
+```{r,  message = FALSE, warning = FALSE}
+  # We want to group the data by state and year and then check the number of unique quarters for each group. If the number of unique quarters is less than 4, then that means some quarters are missing for that state and year combination.
+  statecpi_beta %>%
+    group_by(state, year) %>%
+    summarise(num_quarters = n_distinct(quarter)) %>%
+    filter(num_quarters < 4)
+```
+
+So Oklahoma has only three quarters worth of data in the year 1989. On inspection, Oklahoma does not have data for the 1st quarter of 1989. 
+<br><br>
+*4. Checking for Outliers*
+<br>
+We want to check for outliers or implausible values in the CPI data, CPI data points that differ significantly from the other observations. Outliers can also arise due to an     experimental, measurement or encoding error. Let us plot a box-plot for us to see the potential outliers
+
+```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Figure 1: Boxplot depicting outliers", message = FALSE, warning = FALSE}
+  ggplot(statecpi_beta) +
+    aes(x = "", y = pi) +
+    geom_boxplot(fill = "#0c4c8a") +
+    theme_minimal()
+```
+
+We see that there are three suspected outliers. Let us use the Rosen Test as the data follows approximately a normal distribution and has large number of observations. 
+
+```{r,  message = FALSE, warning = FALSE}
+library(EnvStats)
+test <- rosnerTest(statecpi_beta$pi,
+    k = 3
+  )
+test$distribution
+test$sample.siz
+test$parameters
+test$all.stats
+```
+Therefore we need to remove these three outliers from our analysis.
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+**Summary**
+
+So let us summarize the findings of our analysis.
+Only 34 out of 40 states have quarter-wise inflation data.
+Out of these 34 states, 13 have data from 1989 till 2017 and 21 have data from 1978 to 2017. However, all of these 21 state seem to not have quarter-wise inflation data for the year 1987 and 1988.
+There is only one case where a state does not have data for all 4 quarters for any specific year. 
+We have identified 3 outliers using the descriptive analysis and Rosen Test. 
+</div>
+<br>
+Okay let's now solve all these issues. 
+
+```{r}
+# Let us filter out the years where 13 states do not have data.
+statecpi_filtered <- statecpi_beta %>% group_by(state, year) %>% filter(year >= 1989)
+# Let us add a row
+cpi1989 <- statecpi_beta %>% filter(year == 1989, quarter == 1)
+meancpi <- mean(cpi1989$pi)
+Oklahoma_1989_1 <- data.frame(state = "Oklahoma", year = 1989, quarter = 1, pi = meancpi)
+statecpi_imputed <- rbind(statecpi_filtered, Oklahoma_1989_1)
+# Let us remove the outlier values mentioned in previous analysis and repeat the imputation process with the mean. 
+cpi256 <- statecpi_imputed %>% filter(year == 1995, quarter == 4)
+meancpi256 <- mean(cpi256$pi)
+cpi332 <- statecpi_imputed %>% filter(year == 2003, quarter == 2)
+meancpi332 <- mean(cpi332$pi)
+cpi35 <- statecpi_imputed %>%  filter(year == 2001, quarter == 1)
+meancpi35 <- mean(cpi35$pi)
+df <- statecpi_imputed %>% 
+  mutate(pi = replace(pi, pi == 332.52344, meancpi332), pi = replace(pi, pi == 256.33800, meancpi256), pi = replace(pi, pi == -35.64684, meancpi35))
+summary(df)
+```
+
+**We now have a dataset "df" to work with!**
+<br><br>
+**Sub-Question 2: Dispersion of Inflation**
+<br><br>
+We want to in one single graph plot the median, 25th and 75th percentiles of state level inflation for each quarter.
+
+```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Figure 2: Boxplot depicting the median, 25th percentile and 75th percentile", message = FALSE, warning = FALSE}
+df %>% group_by(quarter) %>% filter(pi > -10)  %>% 
+  ggplot( aes(x=reorder(quarter, pi), y=pi, fill=quarter)) + 
+    geom_boxplot() +
+    xlab("quarter") +
+    theme(legend.position="none")
+
+
+```
+<br>
+Now, we wish to ascertain if inflation dispersion has increased over time. To do this, we shall track the trend of S.D (Standard Deviation).
+
+```{r inflation_dispersion_SD, fig.align="center", fig.width=6, fig.height=6, fig.cap="Figure: Trend of dispersion of inflation", message = FALSE, warning = FALSE}
+# Load necessary libraries
+library(dplyr)    # For data manipulation
+library(ggplot2)  # For plotting
+
+# Calculate the standard deviation of inflation (pi) for each quarter
+df %>%
+  # Group the data by year and quarter, and calculate the standard deviation of pi
+  group_by(year, quarter) %>%
+  summarise(sd_inflation = sd(pi)) %>%
+  ungroup() %>%
+  # Create a new column called quarter_label, which combines the year and quarter into a single string
+  mutate(quarter_label = paste0(year, "-Q", quarter)) -> sd_df
+
+# Plot the standard deviation of inflation against quarter
+ggplot(sd_df, aes(x = quarter_label, y = sd_inflation, group = 1)) +
+  # Add a line connecting the data points
+  geom_line() +
+  # Add a smoothed trend line using a LOESS regression method
+  geom_smooth(method = "loess", se = FALSE) +
+  # Set the x-axis label and breaks to show every fourth quarter label, and adjust the spacing between labels
+  scale_x_discrete(name = "Quarter", breaks = sd_df$quarter_label[seq(1, nrow(sd_df), 4)], expand = c(0.02, 0.5)) +
+  # Set the y-axis label and plot title
+  labs(y = "Standard deviation of inflation") +
+  # Adjust the theme to increase the spacing between the x-axis labels
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, margin = margin(t = 10, r = 10, b = 10, l = 10)))
+
+```
+<br>
+We see that variation over time is extremely volatile and shows an slight over-all increasing trend.
+<br><br>
+**Sub Question 3: Share of States**
+<br>
+We need to calculate the share of states had inflation more than 100 basis points away from median state level inflation in Q4 of 2009.
+
+```{r}
+# Create a new dataframe named "df_2009Q4" that contains state-level inflation data for the 4th Quarter of 2009.
+df_2009Q4 <- df %>%  filter(year == "2009", quarter == "4")
+median_2009Q4 <- median(df_2009Q4$pi)
+
+# Calculate the absolute difference between each state's inflation rate and the median inflation rate
+abs_diff <- abs(df_2009Q4$pi - median_2009Q4)
+
+# Calculate the proportion of states that had an absolute difference of more than 100 basis points from the median inflation rate
+share_above_100bps <- sum(abs_diff > 0.01 * 100) / nrow(df_2009Q4)
+
+share_above_100bps
+
+```
+<br>
+So we see that **32.23 %** of states have inflation more than 100 basis points away from Median state level inflation in Q4 of 2009. 
+<br><br>
+
+**Sub-Question 4: Percentage of Total Variation**
+<br>
+The first question to answer is what percent of the total variation in state level inflation is due to differences across individual states?
+
+To answer this question I can think of using ANOVA (Analysis of Variance). Analysis of variance (ANOVA) is a statistical procedure for summarizing a classical linear model—a decomposition of sum of squares into a component for each source of variation in the model—along with an associated test (the F-test) of the hypothesis that any given source of variation in the model is zero.
+
+```{r}
+# Fit an ANOVA model to the data
+model <- aov(pi ~ state, data = df)
+
+# Extract the sum of squares
+ss <- anova(model)$"Sum Sq"
+
+# Calculate the explained sum of squares (SSE) i.e between-groups sum of squares
+sse <- ss[1]
+
+# Calculate the residual sum of squares (SSR) i.e within-groups sum of squares 
+ssr <- ss[2]
+
+# Calculate the total sum of squares (TSS)
+tss <- sse + ssr
+
+# Calculate the percentage of variation due to differences across individual states
+state_variation <- sse / tss * 100
+
+# Calculate the percentage of variation due to common changes in inflation across all states
+common_variation <- ssr / tss * 100
+
+  
+state_variation
+common_variation
+
+```
+<br>
+This test reveals that the **2.27 percent** of the total variation in state level inflation is due to differences across individual states and **97.73 percent** of total variation due to common changes in inflation across all states.
+<br><br>
+**Sub-Question 5: Testing the Hypothesis**
+<br><br>
+The following hypothesis must be tested:
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+“The persistence of inflation in the United States has been falling over time. However, declining persistence is due national and not to state level factors.”
+</div>
+The steps to doing that are as follows. 
+<br><br>
+**1. First, we need a measure of inflation persistence.**
+
+  The data given here is a time-series data. Therefore, using this data, inflation persistence can be measured by regressing inflation on several of its own lags and then           calculate the sum of the coefficients on lagged inflation. In other words, estimate a univariate autoregressive (AR) time series model and to measure persistence as the sum of    the estimated AR coefficients.
+    
+  Before, we begin to define the AR model, it would be informative to descriptively analyze the time-series data, by plotting the Auto-Correlation and Partial Correlation           Functions for each state. 
+  
+  First let us transform our panel data from long to wide from with time being the unique-identifying factor. 
+  
+  ```{r, eval = FALSE}
+  library(reshape2)
+  # Group the data by year and quarter
+   df %>%  group_by(year, quarter) %>%
+  # Create a new column called quarter_label, which combines the year and quarter into a single string
+  mutate(quarter_label = paste0(year, "-Q", quarter)) -> df_quarter_year
+  # Re-shape into wide form;
+  df_wide <- dcast(df_quarter_year
+                    , quarter_label ~ state, value.var = "pi")
+  View(df_wide)
+  ```
+  
+  
+  Okay now we have our data in wide form. After testing and correcting to ensure stationary, we should plot the acf and pacf for the 34 states. This will indicate if inflation is   persistent. This will also inform us whether an AR model can be used to measure inflation persistence. 
+  
+  Once we do that, we can measure persistence as the summation of co-efficient of an AR model for each state. 
+  
+  Suppose we have a time series $Pi_t$, which we believe follows an autoregressive model of order $k$:
+  
+  $$
+  \Pi_t = \beta + \phi_1 \Pi_{t-1} + \phi_2 \Pi_{t-2} + \cdots + \phi_k \Pi_{t-k} + \epsilon_t
+  $$
+  
+  where $\phi$ is the autoregressive coefficient and $\epsilon_t$ is the error term at time $t$. Here, the sum of lagged terms, that is $\sum_{i=1}^{k}$.  
+  
+  For example, we can compute an ACF and PACF chart for one state. Let us choose California. 
+  
+```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Figure 4: Time Series Plot for Inflation in California", message = FALSE, warning = FALSE}
+#Let us first filter out quarter-wise inflation data for California
+df_california <- filter(df, state == "California")
+#Let us plot the time-series graph for "df_california"
+plot(df_california$pi, type = "l", xlab = "Time Period", ylab = "pi", main = "Time Series Plot for California")
+```
+We notice that it may be stationary. Let us check it through Augmented Dicky Fuller Test.
+```{r, message = FALSE, warning = FALSE}
+library(tseries)
+adf.test(df_california$pi)
+```
+We see that the we cannot reject the null hypothesis because the p-value is not smaller than 0.05. This indicates that the time series is non-stationary.Let us make it stationary by taking the difference in the time series vector.
+```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Figure 5: 1st Difference Time Series Plot for Inflation in California", message = FALSE, warning = FALSE}
+diff_df_california <- diff(df_california$pi)
+plot(diff(df_california$pi), type = "l", xlab = "Time Period")
+adf.test(diff(df_california$pi))
+```
+It is stationary now. Now let us plot the ACF and PACF for California. 
+```{r, fig.align="center", fig.width=6, fig.height=6, fig.cap="Figure 6: ACF of Time Series Plot for Inflation in California", message = FALSE, warning = FALSE}
+acf(diff_df_california, plot = TRUE)
+```
+
+```{r, , fig.align="center", fig.width=6, fig.height=6, fig.cap="Figure 7: PACF of Time Series Plot for Inflation in California", message = FALSE, warning = FALSE}
+pacf(diff_df_california, plot = TRUE)
+```
+
+An eye-test of the graph indicates that ACF is trailing off and PACF is cut-off at 4. This would indicate that an AR(4) model would best fit this. From now on, we can measure persistence through the AR(4) model. We must repeat this for other states. 
+
+**2. Now we need a null hypothesis and alternate hypothesis to test if inflation persistence is indeed falling across states**
+
+**3. If inflation persistence is falling across states, we need to determine if this fall is due to national and not state-level factors.** 
+
+*Note: I find the final question, a little beyond my knowledge. Forgive me for not seeing this question through and if I have made errors. I am still a novice at this. I shall study more and come back to this question with a better conceptual understanding. Thank You!*
+
+<center>
+
+</center>
+<br><br><br><br>
+
+<center>
+ **Task 2: Text to Data Analysis**
+</center>
+
+<br><br><br><br>
+**Let us create two new columns. Namely, "City" and "State"**
+
+To do this, we use the following script. 
+
+```{r, message = FALSE, warning = FALSE}
+library(readr)
+library(stringr)
+setwd("/Volumes/Fire/RA_Econ/Econ RA Assignments/RA_task2023_with_data")
+patent <- read_csv("PatentsRawData.csv")
+plant <- read_csv("PlantLocations.csv")
+
+
+state <- c() # create an empty vector to store state information
+city <- c() # create an empty vector to store city information
+locations <- as.character(patent$inventorlocation) # Extract the "inventorlocation" column from patent and store it as characters
+
+# Loop through each location in "locations" 
+for (x in 1:length(locations)) {
+  tokens <- str_split(locations[x], ',')[[1]]  # Split the location string by comma and store the tokens in a list
+  tokens <- str_trim(tokens) # Trim leading/trailing whitespaces from each token
+  tokens <- tokens[str_length(tokens) > 1] # Extracting all tokens with more than one character
+  
+  if (length(tokens) >0) { 
+    state[x] <- tokens[length(tokens)] # Extract the last token as state in "State" Vector
+  } else {state[x] <- -1 # If no state information found, set it to -1
+  }
+  
+  if (length(tokens) >1){ # Extract the second-to-last token as city and store in 'city' vector
+    city[x] <- tokens[length(tokens) - 1] # If no city information found, set it to -1
+  } else {city[x] <- -1
+  }
+
+}
+
+
+patent$State <- state
+patent$City <- city
+patent <- patent[, c("id", "company", "inventorlocation", "State", "City")]
+
+datatable(patent, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T) )
+
+
+```
+Our objective is try and match as much as possible of the **1563** unique patents to their respective places of origins (factories) using the location of residence of the inventor. 
+
+We want to match the city column of the "patent' dataframe to city column of the "plants" dataframe. This will directly match part of the patents to the place of origin.This will ensure that part of the total patents are matched. For the rest, we can join through company, which will give us potential different factory locations. 
+
+```{r}
+library(knitr)
+library(dplyr)
+# Let us first join using the city. 
+colnames(patent)[2] <- "Company"
+patent_joined <- inner_join(patent, plant, by = c("City", "Company"))
+View(patent_joined)
+distinct_count_patent_joined <- patent_joined %>% 
+  summarize(num_distinct_items = n_distinct(id))
+distinct_count_patent_joined
+```
+
+So out of 1563, we have accurately mapped 409 of patents to their factory of origin as the factory (as the factory and the inventor shared the same city) through this manoveur. 
+
+```{r}
+# Let us find the patents in "patent" and not in "patent_joined"
+patent_unmatched <- anti_join(patent, patent_joined, by = c("City", "Company"))
+View(patent_unmatched)
+#Rename "state.x" and "state.y" columns in "patent_joined" dataframe
+colnames(patent_joined)[4] <- "state"
+colnames(patent_joined)[6] <- "statefull"
+patent_unmatched %>% 
+  summarize(num_distinct_items = n_distinct(id))
+```
+So we have 1154 patents left to be matched. 
+
+Here, we notice that, in "patent_joined"' dataframe, the abbreviated/half-spelled/mis-spelled state names from the "patent" dataframe can now be matched with to the "plant" dataframe. So through this, we can make a dictionary of the abbreviations/mis-spelled state names to their full form. This dictionary can then be used later to tidy up the "state" column of patent_unmatched and further match patent to factory of origin. 
+
+```{r}
+#Get unique values of 
+state_x_unique <- unique(patent_joined$state)
+# Create a dictionary to map state.x to state.y
+dict <- setNames(patent_joined$statefull, patent_joined$state)
+# Create a new dictionary with only distinct abbreviations
+dict_distinct <- dict[state_x_unique]
+# Add "N. J." = "New Jersey" as it features multiple times and wasn't in patent_joined
+dict_distinct["N. J."] <- "New Jersey"
+# Print the dictionary with distinct abbreviations
+print(dict_distinct)
+# Replace abbreviations in State column with their corresponding values
+ patent_unmatched$State <- ifelse(paste0(patent_unmatched$State) %in% names(dict_distinct),
+                                  dict_distinct[paste0(patent_unmatched$State)], 
+                                  paste0(patent_unmatched$State))
+ View(patent_unmatched)
+```
+
+Now we can join "patent_unmatched" to "patent" to further match specific patents to locations. 
+```{r}
+#Join by State and Company
+patent_joined2 <- inner_join(patent_unmatched, plant, by = c("State", "Company"))
+#Rename city.x and city.y
+colnames(patent_joined2)[6] <- "factory_city"
+colnames(patent_joined2)[5] <- "residence_city"
+View(patent_joined)
+#Create a dataframe that combines all the cities a company could have factories in within a state
+patent_cities <- patent_joined2 %>% 
+   group_by(id) %>%      summarize(Cities = paste(unique(factory_city), collapse = ", "))
+#Join "patent_cities" with "patent_joined2" to give the potential cities a factory that the patent originated from could be in
+patent_joined4 <- left_join(patent_joined2, patent_cities, by = "id")
+View(patent_joined4)
+#Let us filter out only those patents that have only one city in the "Cities" column.
+patent_one_city <- patent_joined4 %>% 
+  filter(str_count(Cities, ",") == 0)
+View(patent_one_city)
+patent_one_city %>% 
+  summarize(num_distinct_items = n_distinct(id))
+
+```
+As seen in "patent_one_city" there are 686 distinct patent ids indicated 686 more patents have been matched to their factory of origin. So far we have matched **1095** patents. Now there are some patents that are left out while joining "patent_unmatched" and "patent_joined4". Also there are some patents that had more than one city in "patent_joined4"
+
+```{r}
+#The ones that were left out of the "patent_joined4" dataframe but were in the "patent_unmatched" dataframe are
+patent_unmatched2 <- anti_join(patent_unmatched, patent_joined4, by = c("State", "Company"))
+View(patent_unmatched2)
+```
+These are hard to match either due to untidy state names or cities not corresponding to the actual cities the factories are in. 
+Regarding the cases where the patents that had more than one city in "patent_joined4"
+
+```{r}
+patent_many_city <- patent_joined4 %>% 
+  filter(str_count(Cities, ",") >= 1)
+View(patent_many_city)
+patent_many_city %>% 
+  summarize(num_distinct_items = n_distinct(id))
+```
+Then there are **82** patents whose **state of origin has been determined** but have **2 or more** possible cities of location.
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue"> 
+So in summation we have determined the the state and city of the origin of 1095 patents and state and potential city of origin of 82 patents. This gives us a rough approximate 75.3 % of coverage. 
+<br><br><br><br>
+
